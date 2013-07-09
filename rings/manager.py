@@ -9,8 +9,8 @@ from planck import private
 import numpy as np
 import pandas as pd
 
-from .utils import pids_from_tag, sum_by_od, od_range_from_tag
-from .destriping import DestripingEquation, DestripingPreconditioner
+from utils import pids_from_tag, sum_by_od, od_range_from_tag
+from destriping import DestripingEquation, DestripingPreconditioner
 
 l.basicConfig(level=l.DEBUG)
 
@@ -83,14 +83,13 @@ class RingSetManager(object):
             dictionary of calibrated ringsets Series
         """
         # select only relevant section of the data
-        calibrated_ringsets = self.data.c.copy()
-        # calibrate
+        calibrated_ringsets = pd.DataFrame(self.data.c)
         for ch in self.ch:
-            calibrated_ringsets[ch.tag] *= cal[ch.tag].reindex(calibrated_ringsets[ch.tag].index, level="od")
+            calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c *= cal.ix[ch.tag].reindex(calibrated_ringsets.xs(ch.tag).index, level="od")
         for dip in remove_dipole:
-            calibrated_ringsets -= self.data[dip]
-        calibrated_ringsets = calibrated_ringsets.dropna()
-        return calibrated_ringsets
+            calibrated_ringsets.c -= self.data[dip]
+        #calibrated_ringsets = calibrated_ringsets.dropna()
+        return calibrated_ringsets.c
 
     def create_hit_map(self, index):
         return self.data.hits[index].groupby(level="pix").sum()
@@ -169,11 +168,6 @@ class RingSetManager(object):
     def get_valid_ods(self, ods_ringsets):
         return ods_ringsets.index.get_level_values(level="od").unique()
 
-    def get_chod_index(self, calibrated_ringsets):
-    #df.reset_index(level=column_to_remove_from_index).
-
-        return calibrated_ringsets.groupby(level=["ch", "od"]).sum().index
-
     def destripe(self, calibrated_ringsets, return_baseline_removed=False, return_baselines=False, maxiter=50, tol=1e-14, M=None):
         """Data destriping
 
@@ -198,7 +192,8 @@ class RingSetManager(object):
         #if use_mask:
         #    self.apply_mask("destripingmask_%d.fits" % self.ch.f.freq, field="b")
         RHS = sum_by_od(signalremoved_data * self.data.hits[calibrated_ringsets.index])
-        chod_index = self.get_chod_index(calibrated_ringsets)
+        #chod_index = calibrated_ringsets.index.droplevel("pix").unique()
+        chod_index = calibrated_ringsets.groupby(level=["ch","od"]).first().index
 
         destriping_equation = DestripingEquation(self, M, calibrated_ringsets.index, chod_index)
         destriping_preconditioner = DestripingPreconditioner(self, calibrated_ringsets.index)
@@ -290,7 +285,8 @@ class RingSetManager(object):
 
 if __name__ == "__main__":
     R = RingSetManager(["100-2a"], 256, by_ring=True)
-    R.apply_mask("destripingmask_70.fits")
+    self = R
+    #R.apply_mask("destripingmask_70.fits")
     ods = pids_from_tag("full")
     flat_calibration = pd.Series(np.ones(len(ods), dtype=np.float), index=ods)
     cal = pd.concat({ch.tag: flat_calibration for ch in R.ch}, names=["ch", "od"]) 
