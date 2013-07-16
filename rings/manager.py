@@ -49,9 +49,15 @@ class RingSetManager(object):
         l.info("Loading ringsets to the .data attribute")
         self.data = pd.concat([pd.read_hdf(filename_template.format(chtag=ch.tag, nside=nside, odtag=odtag), "data") for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
         # remove spin-up
-        #if self.ch[0].inst.name == "HFI":
-        #    # FIXME use either rings or OD
-        #    self.data = self.data.drop(range(939, 944+1), level="od")
+        if self.ch[0].inst.name == "HFI":
+            if self.by_ring:
+                for ch in self.ch:
+                    self.data.xs(ch.tag, copy=False).loc[25647:25653+1] = np.nan
+                    # drop last pids
+                    self.data.xs(ch.tag, copy=False).loc[26790:26851+1] = np.nan
+                self.data = self.data.dropna()
+            else:
+                self.data = self.data.drop(range(939, 944+1), level="od")
         #self.pixel_index = self.data.index.levels[2]
         self.index = dict(zip(self.data.index.names, self.data.index.levels))
         self.index_len = {k:len(v) for k,v in self.index.iteritems()}
@@ -83,12 +89,11 @@ class RingSetManager(object):
             dictionary of calibrated ringsets Series
         """
         # select only relevant section of the data
-        calibrated_ringsets = pd.DataFrame(self.data.c)
+        calibrated_ringsets = pd.DataFrame(self.data.c.copy())
         for ch in self.ch:
-            calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c *= cal.ix[ch.tag].reindex(calibrated_ringsets.xs(ch.tag).index, level="od")
+            calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c *= cal[ch.tag].reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
         for dip in remove_dipole:
             calibrated_ringsets.c -= self.data[dip]
-        #calibrated_ringsets = calibrated_ringsets.dropna()
         return calibrated_ringsets.c
 
     def create_hit_map(self, index):
@@ -215,10 +220,10 @@ class RingSetManager(object):
         return tuple(output)
 
     def remove_baselines(self, calibrated_ringsets, baselines):
-        baseline_removed = calibrated_ringsets.copy()
+        baseline_removed = pd.DataFrame({"c":calibrated_ringsets.copy()})
         for ch in self.ch:
-            baseline_removed[ch.tag] -= baselines[ch.tag].reindex(baseline_removed[ch.tag].index, level="od")
-        return baseline_removed
+            baseline_removed.xs(ch.tag, level="ch", copy=False).c -= baselines[ch.tag].reindex(baseline_removed.xs(ch.tag, level="ch", copy=False).index, level="od")
+        return baseline_removed.c
 
     def apply_mask(self, mask_filename):
         """Apply a mask to the data
@@ -284,15 +289,21 @@ class RingSetManager(object):
         return np.degrees(bin_ranges[:-1]+np.radians(bin_resolution_degrees/2.)), pseudomap
 
 if __name__ == "__main__":
-    R = RingSetManager(["100-2a"], 256, by_ring=True)
+    from utils import load_fits_gains
+    by_ring = True
+    #R = RingSetManager(["100-2a"], 64, by_ring=by_ring)
+    ch = Planck()["LFI19M"]
+    R = RingSetManager([ch.tag], 256, by_ring=by_ring)
     self = R
-    #R.apply_mask("destripingmask_70.fits")
+    R.apply_mask("destripingmask_70.fits")
     ods = pids_from_tag("full")
     flat_calibration = pd.Series(np.ones(len(ods), dtype=np.float), index=ods)
-    cal = pd.concat({ch.tag: flat_calibration for ch in R.ch}, names=["ch", "od"]) 
+    cal = {ch.tag: flat_calibration for ch in R.ch}
+    cal_fits = "DDX9S"
+    cal = {ch.tag: load_fits_gains(cal_fits, ch.tag, by_ring) for ch in R.ch}
 
     calibrated_ringsets = R.calibrate(cal)
-    #bin_map, destriped_map = R.destripe(calibrated_ringsets) #, return_baseline_removed=True)
+    bin_map, destriped_map, baseline_removed = R.destripe(calibrated_ringsets, return_baseline_removed=True, maxiter=3)
 
     #survey_map = {}
     #for survey in range(1, 5+1):

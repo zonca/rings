@@ -87,19 +87,23 @@ def load_fits_gains_file(cal, ch):
         ddx9s = pd.Series(np.array(calfile[ch.tag].data.field(0)).byteswap().newbyteorder(), index=np.array(calfile["PID"].data["PID"]).byteswap().newbyteorder())
     return ddx9s
 
-def load_fits_gains(cal, chtag):
+def load_fits_gains(cal, chtag, by_ring=False):
     ch = Planck()[chtag]
     ddx9s = load_fits_gains_file(cal, ch)
     meta = load_ring_meta()
     # relative to DPC mean
     ddx9s /= get_g0(ch)
-    metaod = meta.drop_duplicates("od")
-    ddx9s_od = ddx9s.groupby(level=0).first()[metaod.pid]
-    ddx9s_od.index = metaod.od
-    ddx9s_od.reindex(np.arange(91, 993))
-    ddx9s_od = ddx9s_od.fillna(method="ffill")
-    assert np.isnan(ddx9s_od).sum() == 0
-    return ddx9s_od
+    if by_ring:
+        assert np.isnan(ddx9s).sum() == 0
+        return ddx9s
+    else:
+        metaod = meta.drop_duplicates("od")
+        ddx9s_od = ddx9s.groupby(level=0).first()[metaod.pid]
+        ddx9s_od.index = metaod.od
+        ddx9s_od.reindex(np.arange(91, 993))
+        ddx9s_od = ddx9s_od.fillna(method="ffill")
+        assert np.isnan(ddx9s_od).sum() == 0
+        return ddx9s_od
 
 def slice_data(data, tag, by_pid=False):
     """Slice a datastream by OD using a range tag
