@@ -16,7 +16,7 @@ l.basicConfig(level=l.DEBUG)
 
 class RingSetManager(object):
 
-    def __init__(self, chtags, nside=128, ringsets_folder=private.ringsets_folder, IQU=None, by_ring=False):
+    def __init__(self, chtags, nside=128, tag="full", ringsets_folder=private.ringsets_folder, IQU=None, by_ring=False):
         """Load and manage ringsets data
 
         Loads the data from the df/ subfolder
@@ -45,9 +45,17 @@ class RingSetManager(object):
         self.npix = hp.nside2npix(self.nside)
         self.by_ring = by_ring
         odtag = "" if self.by_ring else "od_"
-        filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_full.h5")
+        filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_all.h5")
         l.info("Loading ringsets to the .data attribute")
         self.data = pd.concat([pd.read_hdf(filename_template.format(chtag=ch.tag, nside=nside, odtag=odtag), "data") for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
+
+        if len(self.ch) == 1:
+            self.data["straylight"] = np.array(pd.read_hdf("/global/u2/z/zonca/p/issues/ringset_to_tod/out/galactic_straylight_%s_256.h5" % self.ch[0].tag, "data"))
+
+        if tag != "full":
+            pids = pids_from_tag(tag)
+            self.data = self.data.reindex(pids, level="od")
+            
         # remove spin-up
         if self.ch[0].inst.name == "HFI":
             if self.by_ring:
@@ -292,10 +300,10 @@ if __name__ == "__main__":
     from utils import load_fits_gains
     by_ring = True
     #R = RingSetManager(["100-2a"], 64, by_ring=by_ring)
-    ch = Planck()["LFI19M"]
+    ch = Planck()["LFI27M"]
     R = RingSetManager([ch.tag], 256, by_ring=by_ring)
     self = R
-    R.apply_mask("destripingmask_70.fits")
+    R.apply_mask("destripingmask_30.fits")
     ods = pids_from_tag("full")
     flat_calibration = pd.Series(np.ones(len(ods), dtype=np.float), index=ods)
     cal = {ch.tag: flat_calibration for ch in R.ch}
@@ -303,7 +311,7 @@ if __name__ == "__main__":
     cal = {ch.tag: load_fits_gains(cal_fits, ch.tag, by_ring) for ch in R.ch}
 
     calibrated_ringsets = R.calibrate(cal)
-    bin_map, destriped_map, baseline_removed = R.destripe(calibrated_ringsets, return_baseline_removed=True, maxiter=3)
+    bin_map, destriped_map, baseline_removed = R.destripe(calibrated_ringsets, return_baseline_removed=True, maxiter=50)
 
     #survey_map = {}
     #for survey in range(1, 5+1):

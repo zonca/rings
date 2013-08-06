@@ -21,7 +21,7 @@ def plot_pseudomap(clock, pseudomap, vmin=-3, vmax=3):
 def load_ring_meta():
     conn = sqlite3.connect(private.database)
     c = conn.cursor()
-    c.execute('select start_time, pointID_unique, end_time, od from list_ahf_infos where start_time >= 106743583006869 and end_time > start_time and od <= %d'% 993)
+    c.execute('select start_time, pointID_unique, end_time, od from list_ahf_infos where start_time >= 106743583006869 and end_time > start_time and od <= %d'% 1358)
     rings = pd.DataFrame(c.fetchall(), columns=["start_time", "pointID_unique", "end_time", "od"])
     rings = rings.join(pd.Series([int(r.split("-")[0]) for r in rings["pointID_unique"]], name="pid"))
     return rings
@@ -39,7 +39,9 @@ def od_range_from_tag(tag):
     elif tag == "year3":
         od_range = [private.survey[5].OD[0], private.survey[6].OD[1]]
     elif tag == "full":
-        od_range = [private.survey[1].OD[0], private.survey[5].OD[1]]
+        od_range = [private.survey[1].OD[0], private.survey[7].OD[1]]
+    elif tag == "all":
+        od_range = [private.survey[1].OD[0], private.survey[8].OD[1]]
     return od_range
 
 def pid_range_from_tag(tag):
@@ -55,7 +57,7 @@ def pid_range_from_tag(tag):
     elif tag == "year3":
         od_range = [private.survey[5].PID_LFI[0], private.survey[6].PID_LFI[1]]
     elif tag == "full":
-        od_range = [private.survey[1].PID_LFI[0], private.survey[5].PID_LFI[1]]
+        od_range = [private.survey[1].PID_LFI[0], private.survey[7].PID_LFI[1]]
     meta = load_ring_meta()
     od_range = [ meta[meta.pid == od_range[0]].index[0], 
                  meta[meta.pid == od_range[1]].index[-1]]
