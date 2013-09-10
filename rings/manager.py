@@ -45,14 +45,14 @@ class RingSetManager(object):
         self.npix = hp.nside2npix(self.nside)
         self.by_ring = by_ring
         odtag = "" if self.by_ring else "od_"
-        filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_all.h5")
+        filename_template = os.path.join(ringsets_folder, "rings_easy_{odtag}{freq}_{nside}_all.h5")
         l.info("Loading ringsets to the .data attribute")
-        self.data = pd.concat([pd.read_hdf(filename_template.format(chtag=ch.tag, nside=nside, odtag=odtag), "data") for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
+        self.data = pd.concat([pd.read_hdf(filename_template.format(freq=ch.f.freq, nside=nside, odtag=odtag), ch.tag) for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
 
-        if len(self.ch) == 1:
+        if len(self.ch) == 1 and nside == 256:
             self.data["straylight"] = np.array(pd.read_hdf("/global/u2/z/zonca/p/issues/ringset_to_tod/out/galactic_straylight_%s_256.h5" % self.ch[0].tag, "data"))
 
-        if tag != "full":
+        if tag != "all":
             pids = pids_from_tag(tag)
             self.data = self.data.reindex(pids, level="od")
             
@@ -78,7 +78,7 @@ class RingSetManager(object):
 
         if self.IQU:
             self.data["qw"], self.data["uw"] = compute_pol_weigths(self.data["psi"])
-        del self.data["psi"]
+        #del self.data["psi"]
 
     def __str__(self):
         return "RingSetManager object, channels %s, nside %d" % (str(self.ch), self.nside)
@@ -121,7 +121,8 @@ class RingSetManager(object):
         if not self.IQU:
             M = pd.DataFrame({ "II":1./invM.II })
             #low hits pixels
-            discard_threshold = 0.001 if self.by_ring else 0.01
+            # discard_threshold 0
+            discard_threshold = 0
             logrcond = invM.II > discard_threshold * invM.II.median()
         else:
             M = pd.DataFrame({
