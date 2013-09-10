@@ -89,7 +89,7 @@ def load_fits_gains_file(cal, ch):
     filename = sorted(glob(os.path.join(private.cal_folder, cal, "C%03d-*.fits" % ch.f.freq)))[-1]
     with pyfits.open(filename) as calfile:
         # DPC gains are stored big-endian!!! need to swap
-        ddx9s = pd.Series(np.array(calfile[ch.tag].data.field(0)).byteswap().newbyteorder(), index=np.array(calfile["PID"].data["PID"]).byteswap().newbyteorder())
+        ddx9s = pd.DataFrame({"gain":np.array(calfile[ch.tag].data.field(0)).byteswap().newbyteorder(), "offset":np.array(calfile[ch.tag].data.field(1)).byteswap().newbyteorder()}, index=np.array(calfile["PID"].data["PID"]).byteswap().newbyteorder())
     return ddx9s
 
 def load_fits_gains(cal, chtag, by_ring=False):
@@ -97,9 +97,12 @@ def load_fits_gains(cal, chtag, by_ring=False):
     ddx9s = load_fits_gains_file(cal, ch)
     meta = load_ring_meta()
     # relative to DPC mean
-    ddx9s /= get_g0(ch)
+    g0 = get_g0(ch)
+    ddx9s["gain"] /= g0
+    ddx9s["offset"] *= g0
     if by_ring:
-        assert np.isnan(ddx9s).sum() == 0
+        assert np.isnan(ddx9s.gain).sum() == 0
+        assert np.isnan(ddx9s.offset).sum() == 0
         return ddx9s
     else:
         metaod = meta.drop_duplicates("od")

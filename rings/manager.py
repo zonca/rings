@@ -99,7 +99,8 @@ class RingSetManager(object):
         # select only relevant section of the data
         calibrated_ringsets = pd.DataFrame(self.data.c.copy())
         for ch in self.ch:
-            calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c *= cal[ch.tag].reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
+            calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c -= cal[ch.tag].offset.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
+            calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c *= cal[ch.tag].gain.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
         for dip in remove_dipole:
             calibrated_ringsets.c -= self.data[dip]
         return calibrated_ringsets.c
