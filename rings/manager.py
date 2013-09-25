@@ -9,14 +9,14 @@ from planck import private
 import numpy as np
 import pandas as pd
 
-from utils import pids_from_tag, sum_by_od, od_range_from_tag
+from utils import pids_from_tag, sum_by_od, pid_range_from_tag, load_ring_meta
 from destriping import DestripingEquation, DestripingPreconditioner
 
 l.basicConfig(level=l.DEBUG)
 
 class RingSetManager(object):
 
-    def __init__(self, chtags, nside=128, tag="full", ringsets_folder=private.ringsets_folder, IQU=None, by_ring=False):
+    def __init__(self, chtags, nside=128, tag="full", ringsets_folder=private.ringsets_folder, IQU=None, by_ring=False, del_psi=True):
         """Load and manage ringsets data
 
         Loads the data from the df/ subfolder
@@ -45,11 +45,15 @@ class RingSetManager(object):
         self.npix = hp.nside2npix(self.nside)
         self.by_ring = by_ring
         odtag = "" if self.by_ring else "od_"
-        filename_template = os.path.join(ringsets_folder, "rings_easy_{odtag}{freq}_{nside}_all.h5")
+        #filename_template = os.path.join(ringsets_folder, "rings_easy_{odtag}{freq}_{nside}_all.h5")
+        filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_all.h5")
+        if ringsets_folder.find("totdip") > 0:
+            filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_full.h5")
         l.info("Loading ringsets to the .data attribute")
-        self.data = pd.concat([pd.read_hdf(filename_template.format(freq=ch.f.freq, nside=nside, odtag=odtag), ch.tag) for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
+        #self.data = pd.concat([pd.read_hdf(filename_template.format(freq=ch.f.freq, nside=nside, odtag=odtag), ch.tag) for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
+        self.data = pd.concat([pd.read_hdf(filename_template.format(chtag=ch.tag, nside=nside, odtag=odtag), "data") for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
 
-        if len(self.ch) == 1 and nside == 256:
+        if len(self.ch) == 1 and nside == 256 and self.ch[0].inst.name == "LFI" and ringsets_folder.find("totdip")<0:
             self.data["straylight"] = np.array(pd.read_hdf("/global/u2/z/zonca/p/issues/ringset_to_tod/out/galactic_straylight_%s_256.h5" % self.ch[0].tag, "data"))
 
         if tag != "all":
@@ -78,7 +82,8 @@ class RingSetManager(object):
 
         if self.IQU:
             self.data["qw"], self.data["uw"] = compute_pol_weigths(self.data["psi"])
-        #del self.data["psi"]
+        if del_psi:
+            del self.data["psi"]
 
     def __str__(self):
         return "RingSetManager object, channels %s, nside %d" % (str(self.ch), self.nside)
@@ -232,7 +237,7 @@ class RingSetManager(object):
     def remove_baselines(self, calibrated_ringsets, baselines):
         baseline_removed = pd.DataFrame({"c":calibrated_ringsets.copy()})
         for ch in self.ch:
-            baseline_removed.xs(ch.tag, level="ch", copy=False).c -= baselines[ch.tag].reindex(baseline_removed.xs(ch.tag, level="ch", copy=False).index, level="od")
+            baseline_removed.xs(ch.tag, level="ch", copy=False).c -= baselines[ch.tag].reindex(baseline_removed.xs(ch.tag, level="ch", copy=False).index, level="od").fillna(method="ffill")
         return baseline_removed.c
 
     def apply_mask(self, mask_filename):
@@ -251,23 +256,27 @@ class RingSetManager(object):
         self.data = self.data.dropna(axis=0)
 
     def apply_fixfactor(self, fix_factor):
-        self.data.orb_dip *= fix_factor
-        self.data.sol_dip *= fix_factor
-        self.data.c *= fix_factor
+        for k in self.data.keys():
+            if not k in ["hits", "psi"]:
+                self.data[k] *= fix_factor
 
     def get_index(self, level):
         return self.data.index.get_level_values(level)
 
     def get_year_fraction(self):
-        year_fraction = pd.Series(np.nan, index=self.get_index("od"))
-        for year in range(1, 3+1):
-            od_range = od_range_from_tag("year%d" % year)
+        meta = load_ring_meta()
+        year_fraction = pd.Series(np.nan, index=meta.index)
+        for year in range(1, 4+1):
+            od_range = pid_range_from_tag("year%d" % year)
             year_fraction.ix[od_range[0]] = 0.
             surv_end = min(year_fraction.index[-1], od_range[1])
-            year_fraction.ix[surv_end] = 1.
-        # fix for survey 5
-        year_fraction.ix[surv_end] = 1-(od_range[1] - surv_end)/365.
-        return year_fraction.interpolate()
+            for marg in range(10):
+                if (surv_end - marg) in year_fraction.index:
+                    year_fraction.ix[surv_end-marg] = (surv_end -marg - od_range[0])/float((od_range[1] - od_range[0]))
+                    break
+        year_fraction_interpolated = year_fraction.interpolate()
+        assert np.isnan(year_fraction_interpolated).sum() == 0
+        return year_fraction_interpolated
 
     def add_pixel_coordinates(self):
         l.info("Adding pixel Ecliptic coordinates")

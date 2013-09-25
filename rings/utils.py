@@ -3,6 +3,7 @@ import healpy as hp
 import os
 import numpy as np
 import sqlite3
+import exceptions
 
 from planck import private
 from planck.Planck import Planck
@@ -32,12 +33,9 @@ def od_range_from_tag(tag):
     elif tag.startswith("surv"):
         surv_num = int(tag[-1])
         od_range = private.survey[surv_num].OD
-    elif tag == "year1":
-        od_range = [private.survey[1].OD[0], private.survey[2].OD[1]]
-    elif tag == "year2":
-        od_range = [private.survey[3].OD[0], private.survey[4].OD[1]]
-    elif tag == "year3":
-        od_range = [private.survey[5].OD[0], private.survey[6].OD[1]]
+    elif tag.startswith("year"):
+        year_num = int(tag[-1])
+        od_range = [private.survey[2*year_num-1].OD[0], private.survey[2*year_num].OD[1]]
     elif tag == "full":
         od_range = [private.survey[1].OD[0], private.survey[7].OD[1]]
     elif tag == "all":
@@ -50,20 +48,20 @@ def pid_range_from_tag(tag):
     elif tag.startswith("surv"):
         surv_num = int(tag[-1])
         od_range = private.survey[surv_num].PID_LFI
-    elif tag == "year1":
-        od_range = [private.survey[1].PID_LFI[0], private.survey[2].PID_LFI[1]]
-    elif tag == "year2":
-        od_range = [private.survey[3].PID_LFI[0], private.survey[4].PID_LFI[1]]
-    elif tag == "year3":
-        od_range = [private.survey[5].PID_LFI[0], private.survey[6].PID_LFI[1]]
+        if surv_num == 5:
+            od_range[0] += 1
+    elif tag.startswith("year"):
+        year_num = int(tag[-1])
+        od_range = [private.survey[2*year_num-1].PID_LFI[0], private.survey[2*year_num].PID_LFI[1]]
+        if year_num == 3:
+            od_range[0] += 1
     elif tag == "full":
         od_range = [private.survey[1].PID_LFI[0], private.survey[7].PID_LFI[1]]
     elif tag == "all":
         od_range = [private.survey[1].PID_LFI[0], private.survey[8].PID_LFI[1]]
-    else:
-        meta = load_ring_meta()
-        od_range = [ meta[meta.pid == od_range[0]].index[0], 
-                     meta[meta.pid == od_range[1]].index[-1]]
+    meta = load_ring_meta()
+    od_range = [ meta[meta.pid == od_range[0]].index[0], 
+                 meta[meta.pid == od_range[1]].index[-1]]
     return od_range
 
 def ods_from_tag(tag, range_from_tag=od_range_from_tag):
@@ -89,15 +87,19 @@ def load_fits_gains_file(cal, ch):
     filename = sorted(glob(os.path.join(private.cal_folder, cal, "C%03d-*.fits" % ch.f.freq)))[-1]
     with pyfits.open(filename) as calfile:
         # DPC gains are stored big-endian!!! need to swap
-        ddx9s = pd.DataFrame({"gain":np.array(calfile[ch.tag].data.field(0)).byteswap().newbyteorder(), "offset":np.array(calfile[ch.tag].data.field(1)).byteswap().newbyteorder()}, index=np.array(calfile["PID"].data["PID"]).byteswap().newbyteorder())
+        ddx9s = pd.DataFrame({"gain":np.array(calfile[ch.tag].data.field(0)).byteswap().newbyteorder()}, index=np.array(calfile["PID"].data["PID"]).byteswap().newbyteorder())
+        try:
+            ddx9s["offset"] = np.array(calfile[ch.tag].data.field(1)).byteswap().newbyteorder()
+        except exceptions.IndexError:
+            ddx9s["offset"] = 0
     return ddx9s
 
-def load_fits_gains(cal, chtag, by_ring=False):
+def load_fits_gains(cal, chtag, reference_cal, by_ring=False):
     ch = Planck()[chtag]
     ddx9s = load_fits_gains_file(cal, ch)
     meta = load_ring_meta()
     # relative to DPC mean
-    g0 = get_g0(ch)
+    g0 = get_g0(ch, reference_cal=reference_cal)
     ddx9s["gain"] /= g0
     ddx9s["offset"] *= g0
     if by_ring:
@@ -113,7 +115,7 @@ def load_fits_gains(cal, chtag, by_ring=False):
         assert np.isnan(ddx9s_od).sum() == 0
         return ddx9s_od
 
-def slice_data(data, tag, by_pid=False):
+def slice_data(data, tag, by_ring=False):
     """Slice a datastream by OD using a range tag
 
     Parameters
@@ -128,7 +130,7 @@ def slice_data(data, tag, by_pid=False):
     sliced_data : pd.Series
         data sliced on the requested tag
     """
-    ods = pids_from_tag(tag) if by_pid else ods_from_tag(tag)
+    ods = pids_from_tag(tag) if by_ring else ods_from_tag(tag)
     return data.reindex(ods, level="od")
 
 def clean_map(m, nside=None):
