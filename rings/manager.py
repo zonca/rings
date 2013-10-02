@@ -71,10 +71,8 @@ class RingSetManager(object):
             else:
                 self.data = self.data.drop(range(939, 944+1), level="od")
         #self.pixel_index = self.data.index.levels[2]
-        self.index = dict(zip(self.data.index.names, self.data.index.levels))
-        self.index_len = {k:len(v) for k,v in self.index.iteritems()}
 
-        self.ch_weights = pd.Series(np.ones(self.n_ch), index=self.index["ch"])
+        self.ch_weights = pd.Series(np.ones(self.n_ch), index=chtags)
 
         self.IQU = IQU
         if self.IQU is None:
@@ -87,6 +85,9 @@ class RingSetManager(object):
 
     def __str__(self):
         return "RingSetManager object, channels %s, nside %d" % (str(self.ch), self.nside)
+
+    def get_index(self):
+        return dict(zip(self.data.index.names, self.data.index.levels))
 
     def calibrate(self, cal, remove_dipole=["orb_dip", "sol_dip"]):
         """Calibrate and dipole-remove the data
@@ -260,7 +261,7 @@ class RingSetManager(object):
             if not k in ["hits", "psi"]:
                 self.data[k] *= fix_factor
 
-    def get_index(self, level):
+    def get_index_values(self, level):
         return self.data.index.get_level_values(level)
 
     def get_year_fraction(self):
