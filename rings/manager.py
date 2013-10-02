@@ -16,7 +16,7 @@ l.basicConfig(level=l.DEBUG)
 
 class RingSetManager(object):
 
-    def __init__(self, chtags, nside=128, tag="full", ringsets_folder=private.ringsets_folder, IQU=None, by_ring=False, del_psi=True):
+    def __init__(self, chtags, nside=128, tag="full", ringsets_folder=private.ringsets_folder, IQU=None, by_ring=False, del_psi=True, fixfactor=1e3):
         """Load and manage ringsets data
 
         Loads the data from the df/ subfolder
@@ -82,6 +82,14 @@ class RingSetManager(object):
             self.data["qw"], self.data["uw"] = compute_pol_weigths(self.data["psi"])
         if del_psi:
             del self.data["psi"]
+
+        self.fixfactor = fixfactor
+        if self.fixfactor:
+            self.apply_fixfactor(self.fixfactor)
+
+        hits_per_pp_series = self.data.hits.groupby(level="od").sum()
+        self.hits = np.array(hits_per_pp_series)
+        self.pids = hits_per_pp_series.index
 
     def __str__(self):
         return "RingSetManager object, channels %s, nside %d" % (str(self.ch), self.nside)
