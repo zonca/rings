@@ -330,7 +330,7 @@ class RingSetManager(object):
         ods = ringsets.index.get_level_values("od")
         pseudomap = todhit.groupby([ods, bins]).sum()
         pseudomap /= self.data.hits.groupby([ods, bins]).sum()
-        return np.degrees(bin_ranges[:-1]+np.radians(bin_resolution_degrees/2.)), np.ma.masked_invalid(pseudomap.unstack())
+        return np.degrees(bin_ranges[:-1]+np.radians(bin_resolution_degrees/2.)), np.ma.masked_invalid(pseudomap.unstack().T)
 
 if __name__ == "__main__":
     from utils import load_fits_gains
