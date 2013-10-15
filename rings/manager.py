@@ -304,6 +304,22 @@ class RingSetManager(object):
             r["clock"][sl] += 2*np.pi
 
     def create_pseudomap(self, ringsets, bin_resolution_degrees=1.):
+        """Create pseudomap
+
+        Parameters
+        ----------
+        ringsets : pd.DataFrame
+            input ringsets
+        bin_resolution_degrees : float
+            angular size of the bins
+
+        Returns
+        -------
+        angle : array
+            center of each bin angle in degrees
+        pseudomap : 2d masked array
+            pseudomap
+        """
         l.info("Create pseudomap, resolution %.2f degrees" % (bin_resolution_degrees))
         if not hasattr(self.data, "clock"):
             self.add_pixel_coordinates()
@@ -314,7 +330,7 @@ class RingSetManager(object):
         ods = ringsets.index.get_level_values("od")
         pseudomap = todhit.groupby([ods, bins]).sum()
         pseudomap /= self.data.hits.groupby([ods, bins]).sum()
-        return np.degrees(bin_ranges[:-1]+np.radians(bin_resolution_degrees/2.)), pseudomap
+        return np.degrees(bin_ranges[:-1]+np.radians(bin_resolution_degrees/2.)), np.ma.masked_invalid(pseudomap.unstack())
 
 if __name__ == "__main__":
     from utils import load_fits_gains
