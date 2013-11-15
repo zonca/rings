@@ -97,6 +97,9 @@ class RingSetManager(object):
     def get_index(self):
         return dict(zip(self.data.index.names, self.data.index.levels))
 
+    def get_valid_pids(self):
+        return self.data.index.groupby(level="od").first().index
+
     def calibrate(self, cal, remove_dipole=["orb_dip", "sol_dip"]):
         """Calibrate and dipole-remove the data
 
@@ -137,7 +140,7 @@ class RingSetManager(object):
             M = pd.DataFrame({ "II":1./invM.II })
             #low hits pixels
             # discard_threshold 0
-            discard_threshold = 0
+            discard_threshold = 0.05 
             logrcond = invM.II > discard_threshold * invM.II.median()
         else:
             M = pd.DataFrame({

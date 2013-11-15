@@ -12,8 +12,8 @@ from planck.metadata import get_g0
 def plot_pseudomap(clock, pseudomap, vmin=-3, vmax=3):
     import matplotlib.pyplot as plt
     plt.figure(figsize=(16,6))
-    od_axis = pseudomap.index.get_level_values("od").unique()
-    plt.pcolormesh(od_axis, clock, np.ma.masked_invalid(pseudomap.unstack()).T, vmin=vmin, vmax=vmax)
+    od_axis = np.arange(pseudomap.shape[1])
+    plt.pcolormesh(od_axis, clock, pseudomap, vmin=vmin, vmax=vmax)
     plt.xlim([od_axis[0], od_axis[-1]])
     plt.ylim(clock[[0,-1]])
     survey_start = [pid_range_from_tag("survey%d" % surv)[0] for surv in range(1, 7+1)]
