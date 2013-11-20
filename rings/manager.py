@@ -53,8 +53,8 @@ class RingSetManager(object):
         #self.data = pd.concat([pd.read_hdf(filename_template.format(freq=ch.f.freq, nside=nside, odtag=odtag), ch.tag) for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
         self.data = pd.concat([pd.read_hdf(filename_template.format(chtag=ch.tag, nside=nside, odtag=odtag), "data") for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
 
-        if len(self.ch) == 1 and nside == 256 and self.ch[0].inst.name == "LFI" and ringsets_folder.find("totdip")<0:
-            self.data["straylight"] = np.array(pd.read_hdf("/global/u2/z/zonca/p/issues/ringset_to_tod/out/galactic_straylight_%s_256.h5" % self.ch[0].tag, "data"))
+        if len(self.ch) == 1 and self.ch[0].inst.name == "LFI" and ringsets_folder.find("totdip")<0:
+            self.data["straylight"] = np.array(pd.read_hdf("/global/u2/z/zonca/p/issues/ringset_to_tod/out/galactic_straylight_%s_%d.h5" % (self.ch[0].tag, self.nside), "data"))
 
         if tag != "all":
             pids = pids_from_tag(tag)
@@ -116,7 +116,8 @@ class RingSetManager(object):
         # select only relevant section of the data
         calibrated_ringsets = pd.DataFrame(self.data.c.copy())
         for ch in self.ch:
-            calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c -= cal[ch.tag].offset.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
+            if "offset" in cal[ch.tag].columns:
+                calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c -= cal[ch.tag].offset.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
             calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c *= cal[ch.tag].gain.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
         for dip in remove_dipole:
             calibrated_ringsets.c -= self.data[dip]
