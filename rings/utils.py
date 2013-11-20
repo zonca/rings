@@ -92,6 +92,7 @@ def load_fits_gains_file(cal, ch):
             ddx9s["offset"] = np.array(calfile[ch.tag].data.field(1)).byteswap().newbyteorder()
         except exceptions.IndexError:
             ddx9s["offset"] = 0
+        ddx9s.index.name = "od"
     return ddx9s
 
 def load_fits_gains(cal, chtag, reference_cal, by_ring=False):
