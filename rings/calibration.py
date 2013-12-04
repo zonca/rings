@@ -83,8 +83,7 @@ def mult_det(Dinv):
     D_det = Dinv["00"] * Dinv["11"] - Dinv["01"]**2
     return Dinv.div(D_det, axis="index")
 
-def dipole_fit(R):
-    tot_dip = R.data.orb_dip + R.data.sol_dip
+def dipole_fit(R, tot_dip):
     lst_mat_gg = (tot_dip ** 2* R.data.hits).groupby(level="od").sum()
     lst_mat_go = (tot_dip * R.data.hits).groupby(level="od").sum()
     lst_mat_oo = (R.data.hits).groupby(level="od").sum()
