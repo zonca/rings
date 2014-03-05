@@ -51,18 +51,21 @@ class RingSetManager(object):
             filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_full.h5")
         l.info("Loading ringsets to the .data attribute")
         #self.data = pd.concat([pd.read_hdf(filename_template.format(freq=ch.f.freq, nside=nside, odtag=odtag), ch.tag) for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
-        self.data = pd.concat([pd.read_hdf(filename_template.format(chtag=ch.tag, nside=nside, odtag=odtag), "data") for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
+        try:
+            self.data = pd.concat([pd.read_hdf(filename_template.format(chtag=ch.tag, nside=nside, odtag=odtag).replace("all", tag), "data") for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
+        except:
+            self.data = pd.concat([pd.read_hdf(filename_template.format(chtag=ch.tag, nside=nside, odtag=odtag), "data") for ch in self.ch], keys=[ch.tag for ch in self.ch], names=["ch", "od", "pix"])
 
-        #if len(self.ch) == 1 and self.ch[0].inst.name == "LFI" and ringsets_folder.find("totdip")<0:
-        if len(self.ch) == 1 and self.ch[0].inst.name == "LFI":
-            try:
-                self.data["straylight"] = np.array(pd.read_hdf(os.path.join(ringsets_folder, "galactic_straylight_%s_%d.h5" % (self.ch[0].tag, self.nside)), "data"))
-            except:
-                l.error("Cannot load strailight")
+            #if len(self.ch) == 1 and self.ch[0].inst.name == "LFI" and ringsets_folder.find("totdip")<0:
+            if len(self.ch) == 1 and self.ch[0].inst.name == "LFI":
+                try:
+                    self.data["straylight"] = np.array(pd.read_hdf(os.path.join(ringsets_folder, "galactic_straylight_%s_%d.h5" % (self.ch.tag, self.nside)), "data"))
+                except:
+                    l.error("Cannot load strailight")
 
-        if tag != "all":
-            pids = pids_from_tag(tag)
-            self.data = self.data.reindex(pids, level="od")
+            if tag != "all":
+                pids = pids_from_tag(tag)
+                self.data = self.data.reindex(pids, level="od")
             
         # remove spin-up
         if self.ch[0].inst.name == "HFI":
