@@ -95,14 +95,15 @@ def load_fits_gains_file(cal, ch):
         ddx9s.index.name = "od"
     return ddx9s
 
-def load_fits_gains(cal, chtag, reference_cal, by_ring=False):
+def load_fits_gains(cal, chtag, reference_cal=None, by_ring=False):
     ch = Planck()[chtag]
     ddx9s = load_fits_gains_file(cal, ch)
     meta = load_ring_meta()
-    # relative to DPC mean
-    g0 = get_g0(ch, reference_cal=reference_cal)
-    ddx9s["gain"] /= g0
-    ddx9s["offset"] *= g0
+    if reference_cal:
+        # relative to DPC mean
+        g0 = get_g0(ch, reference_cal=reference_cal)
+        ddx9s["gain"] /= g0
+        ddx9s["offset"] *= g0
     if by_ring:
         assert np.isnan(ddx9s.gain).sum() == 0
         assert np.isnan(ddx9s.offset).sum() == 0
