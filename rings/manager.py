@@ -45,8 +45,10 @@ class RingSetManager(object):
         self.npix = hp.nside2npix(self.nside)
         self.by_ring = by_ring
         odtag = "" if self.by_ring else "od_"
-        #filename_template = os.path.join(ringsets_folder, "rings_easy_{odtag}{freq}_{nside}_all.h5")
-        filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_all.h5")
+        if tag == "all":
+            filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_all.h5")
+        else:
+            filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_full.h5")
         if ringsets_folder.find("totdip") > 0:
             filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_full.h5")
         l.info("Loading ringsets to the .data attribute")
@@ -58,12 +60,12 @@ class RingSetManager(object):
 
             #if len(self.ch) == 1 and self.ch[0].inst.name == "LFI" and ringsets_folder.find("totdip")<0:
             if len(self.ch) == 1 and self.ch[0].inst.name == "LFI":
-                try:
-                    self.data["straylight"] = np.array(pd.read_hdf(os.path.join(ringsets_folder, "galactic_straylight_%s_%d.h5" % (self.ch.tag, self.nside)), "data"))
-                except:
-                    l.error("Cannot load strailight")
+                #try:
+                #    self.data["straylight"] = np.array(pd.read_hdf(os.path.join(ringsets_folder, "galactic_straylight_%s_%d.h5" % (self.ch[0].tag, self.nside)), "data"))
+                #except:
+                l.error("Cannot load strailight")
 
-            if tag != "all":
+            if tag != "full" or ringsets_folder.find("dx11_delta")>0:
                 pids = pids_from_tag(tag)
                 self.data = self.data.reindex(pids, level="od")
             
