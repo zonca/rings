@@ -16,7 +16,7 @@ def plot_pseudomap(clock, pseudomap, vmin=-3, vmax=3):
     plt.pcolormesh(od_axis, clock, pseudomap, vmin=vmin, vmax=vmax)
     plt.xlim([od_axis[0], od_axis[-1]])
     plt.ylim(clock[[0,-1]])
-    survey_start = [pid_range_from_tag("survey%d" % surv)[0] for surv in range(1, 7+1)]
+    survey_start = [pid_range_from_tag("survey%d" % surv)[0] for surv in range(1, 8+1)]
     plt.vlines(survey_start, 0, 360)
 
 def load_ring_meta():
