@@ -95,7 +95,7 @@ def load_fits_gains_file(cal, ch):
         ddx9s.index.name = "od"
     return ddx9s
 
-def load_fits_gains(cal, chtag, reference_cal=None, by_ring=False):
+def load_fits_gains(cal, chtag, reference_cal=None, by_ring=True):
     ch = Planck()[chtag]
     ddx9s = load_fits_gains_file(cal, ch)
     meta = load_ring_meta()
@@ -117,7 +117,7 @@ def load_fits_gains(cal, chtag, reference_cal=None, by_ring=False):
         assert np.isnan(ddx9s_od).sum() == 0
         return ddx9s_od
 
-def slice_data(data, tag, by_ring=False):
+def slice_data(data, tag, by_ring=True):
     """Slice a datastream by OD using a range tag
 
     Parameters

@@ -16,7 +16,7 @@ l.basicConfig(level=l.DEBUG)
 
 class RingSetManager(object):
 
-    def __init__(self, chtags, nside=128, tag="full", ringsets_folder=private.ringsets_folder, IQU=None, by_ring=False, del_psi=True, fixfactor=1e3):
+    def __init__(self, chtags, nside=128, tag="full", ringsets_folder=private.ringsets_folder, IQU=None, by_ring=True, del_psi=True, fixfactor=1e3):
         """Load and manage ringsets data
 
         Loads the data from the df/ subfolder
