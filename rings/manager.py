@@ -303,7 +303,7 @@ class RingSetManager(object):
     def add_pixel_coordinates(self):
         l.info("Adding pixel Ecliptic coordinates")
         rot = hp.Rotator(coord = ["G","E"])
-        theta_gal, phi_gal = hp.pix2ang(self.nside, self.data.index.get_level_values("pix"), nest=True)
+        theta_gal, phi_gal = hp.pix2ang(self.nside, np.array(self.data.index.get_level_values("pix")).astype(np.int), nest=True)
         r = self.data
         r["theta_ecl"], r["phi_ecl"] = rot(theta_gal, phi_gal)
         r["clock"] = r["theta_ecl"]
@@ -339,7 +339,7 @@ class RingSetManager(object):
         n_bins = 360. / bin_resolution_degrees
         bin_ranges = np.linspace(0, 2*np.pi, n_bins+1)    
         todhit = ringsets * self.data.hits
-        bins = pd.cut(self.data.clock, bin_ranges)
+        bins = pd.cut(self.data.clock, bin_ranges, precision=10)
         ods = ringsets.index.get_level_values("od")
         pseudomap = todhit.groupby([ods, bins]).sum()
         pseudomap /= self.data.hits.groupby([ods, bins]).sum()
