@@ -3,10 +3,9 @@ import healpy as hp
 import os
 import numpy as np
 import sqlite3
-import exceptions
 
 from planck import private
-from planck.Planck import Planck
+from planck import Planck
 from planck.metadata import get_g0
 
 def plot_pseudomap(clock, pseudomap, vmin=-3, vmax=3):
@@ -87,10 +86,10 @@ def load_fits_gains_file(cal, ch):
     filename = sorted(glob(os.path.join(private.cal_folder, cal, "C%03d-*.fits" % ch.f.freq)))[-1]
     with pyfits.open(filename) as calfile:
         # DPC gains are stored big-endian!!! need to swap
-        ddx9s = pd.DataFrame({"gain":np.array(calfile[ch.tag].data.field(0)).byteswap().newbyteorder()}, index=np.array(calfile["PID"].data["PID"]).byteswap().newbyteorder())
+        ddx9s = pd.DataFrame({"gain":np.array(calfile[str(ch.tag)].data.field(0)).byteswap().newbyteorder()}, index=np.array(calfile["PID"].data["PID"]).byteswap().newbyteorder())
         try:
-            ddx9s["offset"] = np.array(calfile[ch.tag].data.field(1)).byteswap().newbyteorder()
-        except exceptions.IndexError:
+            ddx9s["offset"] = np.array(calfile[str(ch.tag)].data.field(1)).byteswap().newbyteorder()
+        except IndexError:
             ddx9s["offset"] = 0
         ddx9s.index.name = "od"
     return ddx9s
@@ -137,6 +136,5 @@ def slice_data(data, tag, by_ring=True):
 
 def clean_map(m, nside=None):
     nside = 2**np.ceil(np.log2(np.sqrt(m.index[-1]/12.)))
-    print nside
     return hp.ma(hp.ud_grade(np.array(m.I.reindex(np.arange(hp.nside2npix(nside))).fillna(hp.UNSEEN)), nside, order_in="NEST", order_out="RING"))
 

@@ -3,7 +3,7 @@ import logging as l
 import numpy as np
 import gc
 
-from utils import sum_by_od
+from .utils import sum_by_od
 
 class DestripingEquation(object):
 

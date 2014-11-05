@@ -3,14 +3,14 @@ import os
 
 import healpy as hp
 from scipy.sparse import linalg
-from planck.Planck import Planck
+from planck import Planck
 from planck.pointing import compute_pol_weigths
 from planck import private
 import numpy as np
 import pandas as pd
 
-from utils import pids_from_tag, sum_by_od, pid_range_from_tag, load_ring_meta
-from destriping import DestripingEquation, DestripingPreconditioner
+from .utils import pids_from_tag, sum_by_od, pid_range_from_tag, load_ring_meta
+from .destriping import DestripingEquation, DestripingPreconditioner
 
 l.basicConfig(level=l.DEBUG)
 
