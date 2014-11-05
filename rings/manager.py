@@ -176,20 +176,6 @@ class RingSetManager(object):
         l.warning("Discarding %d pixels for bad rcond (or low hits)" % (logrcond<=0).sum())
         return M
 
-    def compute_dipole_constraint_invcond(self, M, dipole_map):
-        if self.IQU:
-            raise NotImplementedError("Constraint implemented T-ONLY")
-
-        monopole = dipole_map.copy()
-        monopole[:] = 1.
-        cond = np.zeros((2,2), dtype=np.float)
-        cond[0,0] = (M.II * dipole_map**2).sum()
-        cond[1,1] = (M.II * monopole**2).sum()
-        cond[1,0] = (M.II * monopole * dipole_map).sum()
-        cond[0,1] = cond[1,0]
-        invcond = np.linalg.inv(cond)
-        return invcond
-
     def sum_to_map(self, ringsets, index=None):
         if not index is None:
             ringsets = ringsets.reindex(index, level="od")
@@ -217,9 +203,28 @@ class RingSetManager(object):
             bin_map["U"] = sum_map.I * M.IU + sum_map.Q * M.QU + sum_map.U * M.UU
         return bin_map
 
-    def remove_signal(self, calibrated_ringsets, bin_map=None, M=None):
+    def compute_dipole_constraint_invcond(self, M, dipole_map):
+        if self.IQU:
+            raise NotImplementedError("Constraint implemented T-ONLY")
+
+        cond = np.zeros((2,2), dtype=np.float)
+        cond[0,0] = (dipole_map.I**2).sum()
+        cond[1,1] = len(dipole_map.I) # monopole**2
+        cond[1,0] = (dipole_map.I).sum() # dipole * monopole
+        cond[0,1] = cond[1,0]
+        invcond = np.linalg.inv(cond)
+        return invcond
+
+    def fit_mono_dipole(self, bin_map, M, dipole_map, dipole_map_cond):
+        dipole_proj = np.dot(dipole_map_cond, np.array([[(bin_map.I * dipole_map.I).sum()], [(bin_map.I).sum()]]))
+        return pd.DataFrame(dict(I=(dipole_proj[0,0] * dipole_map.I + dipole_proj[1,0])))
+
+    def remove_signal(self, calibrated_ringsets, bin_map=None, M=None, dipole_map=None, dipole_map_cond=None):
         if bin_map is None:
             bin_map = self.create_bin_map(calibrated_ringsets, M)
+        if not (dipole_map is None):
+            bin_map -= self.fit_mono_dipole(bin_map, M, dipole_map, dipole_map_cond)
+            
         signalremoved_data = calibrated_ringsets - bin_map.I.reindex(calibrated_ringsets.index, level="pix")
         if self.IQU:
             signalremoved_data -= bin_map.Q.reindex(calibrated_ringsets.index, level="pix") * self.data.qw[calibrated_ringsets.index]
