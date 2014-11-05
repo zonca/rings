@@ -9,6 +9,11 @@ from planck import private
 import numpy as np
 import pandas as pd
 
+try:
+    from exceptions import NotImplementedError
+except:
+    pass
+
 from .utils import pids_from_tag, sum_by_od, pid_range_from_tag, load_ring_meta
 from .destriping import DestripingEquation, DestripingPreconditioner
 
@@ -170,6 +175,20 @@ class RingSetManager(object):
         M = M[logrcond > 0]
         l.warning("Discarding %d pixels for bad rcond (or low hits)" % (logrcond<=0).sum())
         return M
+
+    def compute_dipole_constraint_invcond(self, M, dipole_map):
+        if self.IQU:
+            raise NotImplementedError("Constraint implemented T-ONLY")
+
+        monopole = dipole_map.copy()
+        monopole[:] = 1.
+        cond = np.zeros((2,2), dtype=np.float)
+        cond[0,0] = (M.II * dipole_map**2).sum()
+        cond[1,1] = (M.II * monopole**2).sum()
+        cond[1,0] = (M.II * monopole * dipole_map).sum()
+        cond[0,1] = cond[1,0]
+        invcond = np.linalg.inv(cond)
+        return invcond
 
     def sum_to_map(self, ringsets, index=None):
         if not index is None:
