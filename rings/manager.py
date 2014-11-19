@@ -223,7 +223,7 @@ class RingSetManager(object):
         if bin_map is None:
             bin_map = self.create_bin_map(calibrated_ringsets, M)
         if not (dipole_map is None):
-            bin_map -= self.fit_mono_dipole(bin_map, M, dipole_map, dipole_map_cond)
+            bin_map = bin_map - self.fit_mono_dipole(bin_map, M, dipole_map, dipole_map_cond)
             
         signalremoved_data = calibrated_ringsets - bin_map.I.reindex(calibrated_ringsets.index, level="pix")
         if self.IQU:
