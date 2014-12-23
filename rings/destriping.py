@@ -18,10 +18,14 @@ class DestripingEquation(object):
         l.debug("Destriping equation")
         # 1) expand baselines to baseline ringsets
         baselines_series = pd.Series(baselines, index=self.chod_index)
-        baselines_data_df = pd.DataFrame({"c":np.zeros(len(self.index))}, index=self.index)
-        baselines_data = baselines_data_df.c
-        for ch in self.ringsetmanager.ch:
-            baselines_data_df.xs(ch.tag).c = baselines_series[ch.tag].reindex(baselines_data_df.xs(ch.tag).index, level="od")
+        if len(self.ringsetmanager.ch) == 1:
+            ch = self.ringsetmanager.ch[0]
+            baselines_data = baselines_series.ix[ch.tag].reindex(self.index, level="od")
+        else:
+            baselines_data_df = pd.DataFrame({"c":np.zeros(len(self.index))}, index=self.index)
+            baselines_data = baselines_data_df.c
+            for ch in self.ringsetmanager.ch:
+                baselines_data_df.xs(ch.tag).c = baselines_series[ch.tag].reindex(baselines_data_df.xs(ch.tag).index, level="od")
         # 2) bin ringsets to map
         # 3) remove map from baseline ringsets
         baselines_data = self.ringsetmanager.remove_signal(baselines_data, bin_map=None, M=self.M)
