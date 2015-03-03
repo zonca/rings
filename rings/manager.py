@@ -127,15 +127,19 @@ class RingSetManager(object):
         calibrated_ringsets : hieratchical indexed Series on "ch", "od", "pix"
             dictionary of calibrated ringsets Series
         """
-        # select only relevant section of the data
-        calibrated_ringsets = pd.DataFrame(self.data.c.copy())
-        for ch in self.ch:
-            if "offset" in cal[ch.tag].columns:
-                calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c -= cal[ch.tag].offset.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
-            calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c *= cal[ch.tag].gain.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
-        for dip in remove_dipole:
-            calibrated_ringsets.c -= self.data[dip]
-        return calibrated_ringsets.c
+        if len(self.ch) == 1:
+            ch = self.ch[0]
+            calibrated_ringsets = self.data.c * cal[ch.tag].gain.reindex(self.data.index, level="od").fillna(method="ffill").fillna(method="bfill")
+            return calibrated_ringsets
+        else:
+            calibrated_ringsets = pd.DataFrame(self.data.c.copy())
+            for ch in self.ch:
+                if "offset" in cal[ch.tag].columns:
+                    calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c -= cal[ch.tag].offset.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
+                calibrated_ringsets.xs(ch.tag, level="ch", copy=False).c *= cal[ch.tag].gain.reindex(calibrated_ringsets.xs(ch.tag).index, level="od").fillna(method="ffill").fillna(method="bfill")
+            for dip in remove_dipole:
+                calibrated_ringsets.c -= self.data[dip]
+            return calibrated_ringsets.c
 
     def create_hit_map(self, index):
         return self.data.hits[index].groupby(level="pix").sum()
@@ -281,10 +285,15 @@ class RingSetManager(object):
         return tuple(output)
 
     def remove_baselines(self, calibrated_ringsets, baselines):
-        baseline_removed = pd.DataFrame({"c":calibrated_ringsets.copy()})
-        for ch in self.ch:
-            baseline_removed.xs(ch.tag, level="ch", copy=False).c -= baselines[ch.tag].reindex(baseline_removed.xs(ch.tag, level="ch", copy=False).index, level="od").fillna(method="ffill")
-        return baseline_removed.c
+        if len(self.ch) == 1:
+            ch = self.ch[0]
+            baseline_removed = calibrated_ringsets - baselines.ix[ch.tag].reindex(calibrated_ringsets.index, level="od").fillna(method="ffill")
+            return baseline_removed
+        else:
+            baseline_removed = pd.DataFrame({"c":calibrated_ringsets.copy()})
+            for ch in self.ch:
+                baseline_removed.xs(ch.tag, level="ch", copy=False).c -= baselines[ch.tag].reindex(baseline_removed.xs(ch.tag, level="ch", copy=False).index, level="od").fillna(method="ffill")
+            return baseline_removed.c
 
     def apply_mask(self, mask_filename):
         """Apply a mask to the data
