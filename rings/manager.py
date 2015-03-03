@@ -338,13 +338,13 @@ class RingSetManager(object):
         rot = hp.Rotator(coord = ["G","E"])
         theta_gal, phi_gal = hp.pix2ang(self.nside, np.array(self.data.index.get_level_values("pix")).astype(np.int), nest=True)
         r = self.data
-        r["theta_ecl"], r["phi_ecl"] = rot(theta_gal, phi_gal)
-        r["clock"] = r["theta_ecl"]
+        theta_ecl, phi_ecl = rot(theta_gal, phi_gal)
+        r["clock"] = theta_ecl
         year_fraction = self.get_year_fraction().reindex(self.data.index, level="od")
-        slices = [(year_fraction < .25) & (r["phi_ecl"] < 0),
-            (year_fraction > .25) & (year_fraction < .5) & (np.abs(r["phi_ecl"]) < np.radians(90)),
-            (year_fraction > .5) & (year_fraction < .75) & (r["phi_ecl"] > 0),
-            (year_fraction > .75) & (np.abs(r["phi_ecl"]) > np.radians(90))]
+        slices = [(year_fraction < .25) & (phi_ecl < 0),
+            (year_fraction > .25) & (year_fraction < .5) & (np.abs(phi_ecl) < np.radians(90)),
+            (year_fraction > .5) & (year_fraction < .75) & (phi_ecl > 0),
+            (year_fraction > .75) & (np.abs(phi_ecl) > np.radians(90))]
         for sl in slices:
             r["clock"][sl] *= -1
             r["clock"][sl] += 2*np.pi
