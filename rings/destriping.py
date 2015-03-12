@@ -1,46 +1,42 @@
 import pandas as pd
 import logging as l
-import numpy as np
 import gc
+import numpy as np
 
-from .utils import sum_by_od
+from IPython.core.debugger import Tracer; debug_here = Tracer()
+
+from .utils import sum_by
 
 class DestripingEquation(object):
 
-    def __init__(self, ringsetmanager, M, index, chod_index):
+    def __init__(self, ringsetmanager, M, baselines_index):
         self.ringsetmanager = ringsetmanager
         self.M = M
-        self.index = index
-        self.chod_index = chod_index
+        self.baselines_index = baselines_index
 
     def __call__(self, baselines):
         """Apply destriping operator to a baselines array"""
         l.debug("Destriping equation")
         # 1) expand baselines to baseline ringsets
-        baselines_series = pd.Series(baselines, index=self.chod_index)
-        if len(self.ringsetmanager.ch) == 1:
-            ch = self.ringsetmanager.ch[0]
-            baselines_data = baselines_series.ix[ch.tag].reindex(self.index, level="od")
-        else:
-            baselines_data_df = pd.DataFrame({"c":np.zeros(len(self.index))}, index=self.index)
-            baselines_data = baselines_data_df.c
-            for ch in self.ringsetmanager.ch:
-                baselines_data_df.xs(ch.tag).c = baselines_series[ch.tag].reindex(baselines_data_df.xs(ch.tag).index, level="od")
+        baselines_series = pd.Series(baselines, index=self.baselines_index)
+        assert not np.any(np.isnan(baselines))
+        baselines_data = baselines_series.reindex(self.ringsetmanager.data.index)
+        baselines_data.index = self.ringsetmanager.data.index
         # 2) bin ringsets to map
         # 3) remove map from baseline ringsets
         baselines_data = self.ringsetmanager.remove_signal(baselines_data, bin_map=None, M=self.M)
         # 4) take the mean over ringsets to get signal removed residual for each baseline
-        res = sum_by_od(baselines_data * self.ringsetmanager.data.hits[self.index])
+        res = sum_by(baselines_data * self.ringsetmanager.data.hits, self.ringsetmanager.data.index)
         gc.collect()
         return res
 
 class DestripingPreconditioner(object):
 
-    def __init__(self, ringsetmanager, index):
+    def __init__(self, ringsetmanager):
         """Destriping preconditioner
         
         Divides the residual by the hits per baseline"""
-        self.hits_per_baseline = sum_by_od(ringsetmanager.data.hits[index])
+        self.hits_per_baseline = sum_by(ringsetmanager.data.hits, ringsetmanager.data.index)
 
     def __call__(self, residual):
         return residual / self.hits_per_baseline

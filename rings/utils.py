@@ -11,10 +11,12 @@ from planck.metadata import get_g0
 def plot_pseudomap(clock, pseudomap, vmin=-3, vmax=3):
     import matplotlib.pyplot as plt
     plt.figure(figsize=(16,6))
-    od_axis = np.arange(pseudomap.shape[1])
-    plt.pcolormesh(od_axis, clock, pseudomap, vmin=vmin, vmax=vmax)
-    plt.xlim([od_axis[0], od_axis[-1]])
-    plt.ylim(clock[[0,-1]])
+    #od_axis = np.arange(pseudomap.shape[1])
+    plt.imshow(pseudomap, extent=[0, pseudomap.shape[1], 0, 360], 
+                       aspect='auto', vmin=vmin, vmax=vmax)
+    #plt.pcolormesh(od_axis, clock, pseudomap, vmin=vmin, vmax=vmax)
+    #plt.xlim([od_axis[0], od_axis[-1]])
+    #plt.ylim(clock[[0,-1]])
     survey_start = [pid_range_from_tag("survey%d" % surv)[0] for surv in range(1, 8+1)]
     plt.vlines(survey_start, 0, 360)
 
@@ -77,8 +79,8 @@ def ods_from_tag(tag, range_from_tag=od_range_from_tag):
 def pids_from_tag(tag):
     return ods_from_tag(tag, pid_range_from_tag)
 
-def sum_by_od(df):
-    return np.array(df.groupby(level=["ch","od"]).sum())
+def sum_by(df, grouping):
+    return np.array(df.groupby(grouping).sum())
 
 def load_fits_gains_file(cal, ch):
     from glob import glob
@@ -138,3 +140,33 @@ def clean_map(m, nside=None):
     nside = 2**np.ceil(np.log2(np.sqrt(m.index[-1]/12.)))
     return hp.ma(hp.ud_grade(np.array(m.I.reindex(np.arange(hp.nside2npix(nside))).fillna(hp.UNSEEN)), nside, order_in="NEST", order_out="RING"))
 
+def get_year_fraction():
+    meta = load_ring_meta()
+    year_fraction = pd.Series(np.nan, index=meta.index)
+    for year in range(1, 4+1):
+        od_range = pid_range_from_tag("year%d" % year)
+        year_fraction.ix[od_range[0]] = 0.
+        surv_end = min(year_fraction.index[-1], od_range[1])
+        for marg in range(10):
+            if (surv_end - marg) in year_fraction.index:
+                year_fraction.ix[surv_end-marg] = (surv_end -marg - od_range[0])/float((od_range[1] - od_range[0]))
+                break
+    year_fraction_interpolated = year_fraction.interpolate()
+    assert np.isnan(year_fraction_interpolated).sum() == 0
+    return year_fraction_interpolated
+
+def add_pixel_coordinates(nside, pid, pix):
+    print("Adding pixel Ecliptic coordinates")
+    rot = hp.Rotator(coord = ["G","E"])
+    print("pix2ang and rotation")
+    theta_gal, phi_gal = hp.pix2ang(nside, np.array(pix).astype(np.int), nest=True)
+    clock, phi_ecl = rot(theta_gal, phi_gal)
+    year_fraction = get_year_fraction().reindex(pid)
+    print("Fix clock angle")
+    slices = (year_fraction < .25) & (phi_ecl < 0)
+    slices |= (year_fraction > .25) & (year_fraction < .5) & (np.abs(phi_ecl) < np.radians(90))
+    slices |= (year_fraction > .5) & (year_fraction < .75) & (phi_ecl > 0)
+    slices |= (year_fraction > .75) & (np.abs(phi_ecl) > np.radians(90))
+    clock[slices.values] *= -1
+    clock[slices.values] += 2*np.pi
+    return clock
