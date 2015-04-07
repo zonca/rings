@@ -52,10 +52,10 @@ class RingSetManager(object):
             filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_all.h5")
         else:
             filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_full_clock_pidindex.h5")
-        if ringsets_folder.find("totdip") > 0:
-            filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_full.h5")
+        straylight_filename_template = os.path.join(ringsets_folder, "galactic_straylight_{chtag}_{nside}.h5")
         l.info("Loading ringsets to the .data attribute")
         self.data = pd.read_hdf(filename_template.format(chtag=self.ch, nside=nside, odtag=odtag).replace("all", tag), "data")#.reset_index()
+        self.data["straylight"] = pd.read_hdf(straylight_filename_template.format(chtag=self.ch, nside=nside), "data")
             
         # remove spin-up
         if self.ch.inst.name == "HFI":
@@ -64,8 +64,6 @@ class RingSetManager(object):
                 # drop last pids
                 self.data.loc[26790:26851+1] = np.nan
                 self.data = self.data.dropna()
-            else:
-                self.data = self.data.drop(range(939, 944+1), level="od")
 
         self.IQU = None
 
@@ -86,12 +84,6 @@ class RingSetManager(object):
     def __str__(self):
         return "RingSetManager object, channels %s, nside %d" % (str(self.ch), self.nside)
 
-    def get_index(self):
-        return dict(zip(self.data.index.names, self.data.index.levels))
-
-    def get_valid_pids(self):
-        return self.data.index.groupby(level="od").first().index
-
     def calibrate(self, cal, remove_dipole=["orb_dip", "sol_dip"]):
         """Calibrate and dipole-remove the data
 
@@ -110,11 +102,16 @@ class RingSetManager(object):
             calibrated_ringsets -= self.data[dip]
         return calibrated_ringsets
 
-    def create_hit_map(self):
-        return self.data.hits.groupby(self.data.pix).sum()
+    def create_hit_map(self, index=None):
+        if id(index) == id(self.data.index):
+            hit_map = pd.Series(sum_by(self.data.hits, self.data.pix))
+            hit_map = hit_map[hit_map != 0]
+            return hit_map
+        else:
+            return sum_by(self.data.hits.loc[index[0]:index[-1]], self.data.pix.loc[index[0]:index[-1]], return_nonzero_series=True)
 
-    def create_invM(self):
-        invM = pd.DataFrame({"II":self.create_hit_map()})
+    def create_invM(self, index=None):
+        invM = pd.DataFrame({"II":self.create_hit_map(index)})
         if self.IQU:
             invM["IQ"]=self.sum_to_map(self.data.qw)
             invM["IU"]=self.sum_to_map(self.data.uw)
@@ -124,6 +121,7 @@ class RingSetManager(object):
         return invM
 
     def invert_invM(self, invM):
+        l.info("Invert invM")
         if not self.IQU:
             M = pd.DataFrame({ "II":1./invM.II })
             #low hits pixels
@@ -150,7 +148,11 @@ class RingSetManager(object):
         return M
 
     def sum_to_map(self, ringsets):
-        return (ringsets*self.data.hits).groupby(self.data.pix).sum()
+        if id(ringsets.index) == id(self.data.index):
+            return pd.Series(sum_by(ringsets*self.data.hits, self.data.pix))
+            # return (ringsets*self.data.hits).groupby(self.data.pix).sum()
+        else:
+            return (ringsets*self.data.hits.loc[ringsets.index[0]:ringsets.index[-1]]).groupby(self.data.pix.loc[ringsets.index[0]:ringsets.index[-1]]).sum()
 
     def create_sum_map(self, calibrated_ringsets):
         sum_map = pd.DataFrame({
@@ -163,10 +165,10 @@ class RingSetManager(object):
 
     def create_bin_map(self, calibrated_ringsets, M=None):
         if M is None:
-            M = self.invert_invM(self.create_invM())
+            M = self.invert_invM(self.create_invM(calibrated_ringsets.index))
         sum_map = self.create_sum_map(calibrated_ringsets)
         bin_map = pd.DataFrame({
-            "I":sum_map.I * M.II
+            "I":(sum_map.I * M.II).dropna()
         })
         if self.IQU:
             bin_map["I"] += sum_map.Q * M.IQ + sum_map.U * M.IU
@@ -196,14 +198,11 @@ class RingSetManager(object):
         if not (dipole_map is None):
             bin_map = bin_map - self.fit_mono_dipole(bin_map, M, dipole_map, dipole_map_cond)
             
-        signalremoved_data = calibrated_ringsets - bin_map.I.reindex(self.data.pix).values
-        if self.IQU:
-            signalremoved_data -= bin_map.Q.reindex(calibrated_ringsets.index, level="pix") * self.data.qw[calibrated_ringsets.index]
-            signalremoved_data -= bin_map.U.reindex(calibrated_ringsets.index, level="pix") * self.data.uw[calibrated_ringsets.index]
+        signalremoved_data = (calibrated_ringsets - bin_map.I.reindex(self.data.pix).values)
+        #if self.IQU:
+        #    signalremoved_data -= bin_map.Q.reindex(self.data.pix).values * self.data.qw[calibrated_ringsets.index]
+        #    signalremoved_data -= bin_map.U.reindex(self.data.pix).values * self.data.uw[calibrated_ringsets.index]
         return signalremoved_data
-
-    def get_valid_ods(self, ods_ringsets):
-        return ods_ringsets.index.get_level_values(level="od").unique()
 
     def destripe(self, calibrated_ringsets, return_baseline_removed=False, return_baselines=False, maxiter=50, tol=1e-14, M=None):
         """Data destriping
@@ -221,18 +220,18 @@ class RingSetManager(object):
         """
         l.info("Destripe map")
         if M is None:
-            M = self.invert_invM(self.create_invM())
+            M = self.invert_invM(self.create_invM(calibrated_ringsets.index))
 
         bin_map = self.create_bin_map(calibrated_ringsets, M=M)
         # Remove signal
         signalremoved_data = self.remove_signal(calibrated_ringsets, bin_map)
         #if use_mask:
         #    self.apply_mask("destripingmask_%d.fits" % self.ch.f.freq, field="b")
-        RHS = sum_by(signalremoved_data * self.data.hits, self.data.index)
         baselines_pid = np.unique(self.data.index)
+        RHS = sum_by(signalremoved_data * self.data.hits, self.data.index, target_index=baselines_pid)
 
         destriping_equation = DestripingEquation(self, M, baselines_pid)
-        destriping_preconditioner = DestripingPreconditioner(self)
+        destriping_preconditioner = DestripingPreconditioner(self, baselines_pid)
         n_bas = len(RHS)
         DestripingOperator = linalg.LinearOperator(shape=(n_bas, n_bas), matvec=destriping_equation, dtype=np.double)
         PrecondOperator = linalg.LinearOperator(shape=(n_bas, n_bas), matvec=destriping_preconditioner, dtype=np.double)
@@ -264,6 +263,7 @@ class RingSetManager(object):
         mask_filename : string
             full path to the mask, in standard format, i.e. 0 where masked
         """
+        l.info("Apply mask")
         mask = pd.Series(hp.ud_grade(hp.read_map(mask_filename, nest=True), self.nside, order_in="NESTED", order_out="NESTED"))
         mask[mask<1] = np.nan
         self.data.c *= mask.reindex(self.data.pix).values
@@ -273,10 +273,6 @@ class RingSetManager(object):
         for k in self.data.keys():
             if not k in ["hits", "psi", "pid", "pix", "clock"]:
                 self.data[k] *= fix_factor
-
-    def get_index_values(self, level):
-        return self.data.index.get_level_values(level)
-
 
     def create_pseudomap(self, ringsets, bin_resolution_degrees=1.):
         """Create pseudomap

@@ -3,6 +3,7 @@ import healpy as hp
 import os
 import numpy as np
 import sqlite3
+from numba import jit
 
 from planck import private
 from planck import Planck
@@ -79,8 +80,29 @@ def ods_from_tag(tag, range_from_tag=od_range_from_tag):
 def pids_from_tag(tag):
     return ods_from_tag(tag, pid_range_from_tag)
 
-def sum_by(df, grouping):
-    return np.array(df.groupby(grouping).sum())
+@jit(nopython=True)
+def groupby(index, value, output):
+    for i in range(index.shape[0]):
+        if not np.isnan(value[i]):
+            output[index[i]] += value[i]
+
+
+@jit(nopython=True)
+def reindex_inner(m, pix, output):
+    for i in range(pix.shape[0]):
+        output[i] = m[pix[i]]
+
+def reindex(m, pix, nside):
+    output = np.zeros(len(pix), dtype=m.dtype)
+    reindex_inner(m.reindex(np.arange(hp.nside2npix(nside))).values, pix.values, output)
+    return output
+
+def sum_by(df, grouping, target_index=None, return_nonzero_series=False):
+    out = np.zeros(grouping.max()+1, dtype=df.dtype)
+    groupby(grouping.values, df.values, out)
+    if not target_index is None:
+        out = pd.Series(out).reindex(target_index).values
+    return out
 
 def load_fits_gains_file(cal, ch):
     from glob import glob
@@ -118,7 +140,7 @@ def load_fits_gains(cal, chtag, reference_cal=None, by_ring=True):
         assert np.isnan(ddx9s_od).sum() == 0
         return ddx9s_od
 
-def slice_data(data, tag, by_ring=True):
+def slice_data(data, tag):
     """Slice a datastream by OD using a range tag
 
     Parameters
@@ -133,8 +155,12 @@ def slice_data(data, tag, by_ring=True):
     sliced_data : pd.Series
         data sliced on the requested tag
     """
-    ods = pids_from_tag(tag) if by_ring else ods_from_tag(tag)
-    return data.reindex(ods, level="od")
+    pid_range = pid_range_from_tag(tag)
+    while not pid_range[0] in data.index:
+        pid_range[0] += 1
+    while not pid_range[1] in data.index:
+        pid_range[1] -= 1
+    return data.loc[pid_range[0]: pid_range[1]]
 
 def clean_map(m, nside=None):
     nside = 2**np.ceil(np.log2(np.sqrt(m.index[-1]/12.)))

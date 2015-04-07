@@ -26,17 +26,17 @@ class DestripingEquation(object):
         # 3) remove map from baseline ringsets
         baselines_data = self.ringsetmanager.remove_signal(baselines_data, bin_map=None, M=self.M)
         # 4) take the mean over ringsets to get signal removed residual for each baseline
-        res = sum_by(baselines_data * self.ringsetmanager.data.hits, self.ringsetmanager.data.index)
+        res = sum_by(baselines_data * self.ringsetmanager.data.hits, self.ringsetmanager.data.index, target_index=self.baselines_index)
         gc.collect()
         return res
 
 class DestripingPreconditioner(object):
 
-    def __init__(self, ringsetmanager):
+    def __init__(self, ringsetmanager, baselines_index):
         """Destriping preconditioner
         
         Divides the residual by the hits per baseline"""
-        self.hits_per_baseline = sum_by(ringsetmanager.data.hits, ringsetmanager.data.index)
+        self.hits_per_baseline = sum_by(ringsetmanager.data.hits, ringsetmanager.data.index, target_index=baselines_index)
 
     def __call__(self, residual):
         return residual / self.hits_per_baseline
