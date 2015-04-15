@@ -104,6 +104,22 @@ def sum_by(df, grouping, target_index=None, return_nonzero_series=False):
         out = pd.Series(out).reindex(target_index).values
     return out
 
+@jit(nopython=True)
+def groupby_2d(index_row, index_col, value, output, target_output, target_column_indices):
+    for i in range(index_row.shape[0]):
+        if not np.isnan(value[i]):
+            output[index_row[i], index_col[i]] += value[i]
+    for i in range(target_output.shape[1]):
+        for j in range(output.shape[0]):
+            target_output[j, i] = output[j, target_column_indices[i]]
+
+def sum_by_2d(df, groupings, target_column_indices):
+    assert len(groupings) == 2
+    out = np.zeros((groupings[0].max()+1, groupings[1].max()+1), dtype=df.dtype)
+    target_out = np.zeros((groupings[0].max()+1, len(target_column_indices)), dtype=df.dtype)
+    groupby_2d(groupings[0].values, groupings[1].values, df.values, out, target_out, np.asarray(target_column_indices))
+    return target_out
+
 def load_fits_gains_file(cal, ch):
     from glob import glob
     import pyfits

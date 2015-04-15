@@ -16,7 +16,7 @@ try:
 except:
     pass
 
-from .utils import pids_from_tag, sum_by
+from .utils import pids_from_tag, sum_by, sum_by_2d
 from .destriping import DestripingEquation, DestripingPreconditioner
 
 l.basicConfig(level=l.DEBUG)
@@ -297,10 +297,12 @@ class RingSetManager(object):
         n_bins = 360. / bin_resolution_degrees
         bin_ranges = np.linspace(0, 2*np.pi, n_bins+1)    
         todhit = ringsets * self.data.hits
-        bins = pd.cut(self.data.clock, bin_ranges, precision=10)
-        pseudomap = todhit.groupby([self.data.index, bins]).sum()
-        pseudomap /= self.data.hits.groupby([self.data.index, bins]).sum()
-        return np.degrees(bin_ranges[:-1]+np.radians(bin_resolution_degrees/2.)), np.ma.masked_invalid(pseudomap.unstack().T)
+        bins = pd.cut(self.data.clock, bin_ranges, precision=10, labels=False)
+        # pseudomap = todhit.groupby([self.data.index, bins]).sum()
+        pseudomap = sum_by_2d(todhit, [bins, self.data.index], self.pids)
+        # pseudomap /= self.data.hits.groupby([self.data.index, bins]).sum()
+        pseudomap /= sum_by_2d(self.data.hits, [bins, self.data.index], self.pids)
+        return np.degrees(bin_ranges[:-1]+np.radians(bin_resolution_degrees/2.)), np.ma.masked_invalid(pseudomap)
 
 if __name__ == "__main__":
     from utils import load_fits_gains
