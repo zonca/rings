@@ -55,7 +55,11 @@ class RingSetManager(object):
         straylight_filename_template = os.path.join(ringsets_folder, "galactic_straylight_{chtag}_{nside}.h5")
         l.info("Loading ringsets to the .data attribute")
         self.data = pd.read_hdf(filename_template.format(chtag=self.ch, nside=nside, odtag=odtag).replace("all", tag), "data")#.reset_index()
-        self.data["straylight"] = pd.read_hdf(straylight_filename_template.format(chtag=self.ch, nside=nside), "data")
+        l.info("Loading ringsets to the .data attribute")
+        try:
+            self.data["straylight"] = pd.read_hdf(straylight_filename_template.format(chtag=self.ch, nside=nside), "data")
+        except OSError:
+            l.error("Cannot load straylight from " + straylight_filename_template.format(chtag=self.ch, nside=nside))
             
         # remove spin-up
         if self.ch.inst.name == "HFI":
