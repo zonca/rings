@@ -72,7 +72,7 @@ def create_matvec(R, g_prev, m_prev, M=None, dipole_map=None, dipole_map_cond=No
 
 def create_Dinv(R, hits_per_pp, m_prev):
     data = R.data
-    Dinv = pd.DataFrame({ "11": R.data.hits.groupby(level=0).sum() })
+    Dinv = pd.DataFrame({ "11": sum_by(data.hits, data.index, target_index=R.pids) })
     #Dinv = pd.DataFrame({ "11": hits_per_pp.copy() }, index=R.index["od"])
     Dinv["00"] = sum_by(data.hits * (data.orb_dip + data.sol_dip + m_prev.I.reindex(data.pix).values)**2, data.index, target_index=R.pids)# was D["11"]
     Dinv["01"] = sum_by(data.hits * (data.orb_dip + data.sol_dip + m_prev.I.reindex(data.pix).values) * (-1), data.index, target_index=R.pids) # was - D["01"]
