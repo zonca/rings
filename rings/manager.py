@@ -51,10 +51,10 @@ class RingSetManager(object):
         if tag == "all":
             filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_all.h5")
         else:
-            filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_full_clock_pidindex.h5")
+            filename_template = os.path.join(ringsets_folder, "rings_{odtag}{chtag}_{nside}_{tag}_clock_pidindex.h5")
         straylight_filename_template = os.path.join(ringsets_folder, "galactic_straylight_{chtag}_{nside}.h5")
         l.info("Loading ringsets to the .data attribute")
-        self.data = pd.read_hdf(filename_template.format(chtag=self.ch, nside=nside, odtag=odtag).replace("all", tag), "data")#.reset_index()
+        self.data = pd.read_hdf(filename_template.format(chtag=self.ch, nside=nside, odtag=odtag, tag=tag).replace("all", tag), "data")#.reset_index()
         l.info("Loading ringsets to the .data attribute")
         try:
             self.data["straylight"] = pd.read_hdf(straylight_filename_template.format(chtag=self.ch, nside=nside), "data")
