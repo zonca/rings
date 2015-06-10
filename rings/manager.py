@@ -273,7 +273,10 @@ class RingSetManager(object):
         mask = pd.Series(hp.ud_grade(hp.read_map(mask_filename, nest=True), self.nside, order_in="NESTED", order_out="NESTED"))
         mask[mask<1] = np.nan
         self.data.c *= mask.reindex(self.data.pix).values
+        hits_per_pp = self.data.hits.groupby(level=0).sum()
+        self.data.loc[hits_per_pp[hits_per_pp < 50].index, "c"] = np.nan
         self.data = self.data.dropna(axis=0)
+        self.pids = self.data.index.unique()
 
     def apply_fixfactor(self, fix_factor):
         for k in self.data.keys():
