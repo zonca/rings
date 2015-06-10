@@ -79,6 +79,8 @@ class RingSetManager(object):
         self.fixfactor = fixfactor
         if self.fixfactor:
             self.apply_fixfactor(self.fixfactor)
+        self.data.pix = self.data.pix.astype(np.int)
+        self.data["hits"] = self.data["hits"].astype(np.int)
 
         # hits_per_pp_series = self.data.hits.groupby(level="od").sum()
         # self.hits = np.array(hits_per_pp_series)
