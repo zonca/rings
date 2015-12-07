@@ -8,13 +8,14 @@ from numba import jit
 from planck import private
 from planck import Planck
 from planck.metadata import get_g0
+import matplotlib
 
 def plot_pseudomap(clock, pseudomap, vmin=-3, vmax=3):
     import matplotlib.pyplot as plt
     plt.figure(figsize=(16,6))
     #od_axis = np.arange(pseudomap.shape[1])
     plt.imshow(pseudomap, extent=[0, pseudomap.shape[1], 0, 360], 
-                       aspect='auto', vmin=vmin, vmax=vmax)
+                       aspect='auto', vmin=vmin, vmax=vmax, cmap=matplotlib.cm.cubehelix)
     #plt.pcolormesh(od_axis, clock, pseudomap, vmin=vmin, vmax=vmax)
     #plt.xlim([od_axis[0], od_axis[-1]])
     #plt.ylim(clock[[0,-1]])
