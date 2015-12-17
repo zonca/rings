@@ -57,7 +57,7 @@ class RingSetManager(object):
         self.data = pd.read_hdf(filename_template.format(chtag=self.ch, nside=nside, odtag=odtag, tag=tag).replace("all", tag), "data")#.reset_index()
         l.info("Loading ringsets to the .data attribute")
         try:
-            self.data["straylight"] = pd.read_hdf(straylight_filename_template.format(chtag=self.ch, nside=nside), "data")
+            self.data["straylight"] = pd.read_hdf(straylight_filename_template.format(chtag=self.ch, nside=nside), "data").straylight
         except OSError:
             l.error("Cannot load straylight from " + straylight_filename_template.format(chtag=self.ch, nside=nside))
             
