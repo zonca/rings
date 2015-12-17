@@ -15,9 +15,9 @@ class Monitor(object):
         else:
             l.warning("Call %d" % self.it)
 
-def create_RHS(R, g_prev, m_prev, M=None, dipole_map=None, dipole_map_cond=None):
+def create_RHS(R, g_prev, m_prev, M=None, dipole_map=None, dipole_map_cond=None, mask=None):
     RHS_data = R.data.c / g_prev.reindex(R.data.index)
-    RHS_data = R.remove_signal(RHS_data, M=M, dipole_map=dipole_map, dipole_map_cond=dipole_map_cond)
+    RHS_data = R.remove_signal(RHS_data, M=M, dipole_map=dipole_map, dipole_map_cond=dipole_map_cond, mask=mask)
     RHS_data = RHS_data * g_prev.reindex(R.data.index)
     RHS_baselines = sum_by(RHS_data * R.data.hits, R.data.index, target_index=R.pids)
     RHS_gains = sum_by(RHS_data * \
@@ -44,7 +44,7 @@ def create_precon_matvec(Dinv):
 
 # Define Linear Calibration Operator
 
-def create_matvec(R, g_prev, m_prev, M=None, dipole_map=None, dipole_map_cond=None):
+def create_matvec(R, g_prev, m_prev, M=None, dipole_map=None, dipole_map_cond=None, mask=None):
     data = R.data
     def matvec(baselines_gains):
         """Apply destriping operator to a baselines array"""
@@ -59,7 +59,7 @@ def create_matvec(R, g_prev, m_prev, M=None, dipole_map=None, dipole_map_cond=No
         d += baselines.reindex(data.index)
         
         d /= g_prev.reindex(data.index)
-        d = R.remove_signal(d, M=M, dipole_map=dipole_map, dipole_map_cond=dipole_map_cond)
+        d = R.remove_signal(d, M=M, dipole_map=dipole_map, dipole_map_cond=dipole_map_cond, mask=mask)
         d *= g_prev.reindex(data.index)
         
         RES_baselines = sum_by(d * data.hits, data.index, target_index=R.pids)

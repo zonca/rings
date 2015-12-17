@@ -194,15 +194,18 @@ class RingSetManager(object):
         invcond = np.linalg.inv(cond)
         return invcond
 
-    def fit_mono_dipole(self, bin_map, M, dipole_map, dipole_map_cond):
-        dipole_proj = np.dot(dipole_map_cond, np.array([[(bin_map.I * dipole_map.I).sum()], [(bin_map.I).sum()]]))
+    def fit_mono_dipole(self, bin_map, M, dipole_map, dipole_map_cond, mask=None):
+        if mask is None:
+            mask = bin_map.I.copy()
+            mask[:] = 1.
+        dipole_proj = np.dot(dipole_map_cond, np.array([[(bin_map.I * dipole_map.I * mask).sum()], [(bin_map.I * mask).sum()]]))
         return pd.DataFrame(dict(I=(dipole_proj[0,0] * dipole_map.I + dipole_proj[1,0])))
 
-    def remove_signal(self, calibrated_ringsets, bin_map=None, M=None, dipole_map=None, dipole_map_cond=None):
+    def remove_signal(self, calibrated_ringsets, bin_map=None, M=None, dipole_map=None, dipole_map_cond=None, mask=None):
         if bin_map is None:
             bin_map = self.create_bin_map(calibrated_ringsets, M)
         if not (dipole_map is None):
-            bin_map = bin_map - self.fit_mono_dipole(bin_map, M, dipole_map, dipole_map_cond)
+            bin_map = bin_map - self.fit_mono_dipole(bin_map, M, dipole_map, dipole_map_cond, mask)
             
         signalremoved_data = (calibrated_ringsets - bin_map.I.reindex(self.data.pix).values)
         #if self.IQU:
@@ -259,6 +262,11 @@ class RingSetManager(object):
             baseline_removed = calibrated_ringsets - baselines.reindex(self.data.index).fillna(method="ffill")
             return baseline_removed
 
+    def read_mask(self, mask_filename):
+        mask = pd.Series(hp.ud_grade(hp.read_map(mask_filename, nest=True), self.nside, order_in="NESTED", order_out="NESTED"))
+        mask[mask<1] = np.nan
+        return mask
+
     def apply_mask(self, mask_filename):
         """Apply a mask to the data
 
@@ -270,8 +278,7 @@ class RingSetManager(object):
             full path to the mask, in standard format, i.e. 0 where masked
         """
         l.info("Apply mask")
-        mask = pd.Series(hp.ud_grade(hp.read_map(mask_filename, nest=True), self.nside, order_in="NESTED", order_out="NESTED"))
-        mask[mask<1] = np.nan
+        mask = self.read_mask(mask_filename)
         self.data.c *= mask.reindex(self.data.pix).values
         hits_per_pp = self.data.hits.groupby(level=0).sum()
         self.data.loc[hits_per_pp[hits_per_pp < 50].index, "c"] = np.nan

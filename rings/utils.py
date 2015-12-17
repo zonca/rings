@@ -123,7 +123,7 @@ def sum_by_2d(df, groupings, target_column_indices):
 
 def load_fits_gains_file(cal, ch):
     from glob import glob
-    import pyfits
+    from astropy.io import fits as pyfits
     filename = sorted(glob(os.path.join(private.cal_folder, cal, "C%03d-*.fits" % ch.f.freq)))[-1]
     with pyfits.open(filename) as calfile:
         # DPC gains are stored big-endian!!! need to swap
