@@ -182,14 +182,17 @@ class RingSetManager(object):
             bin_map["U"] = sum_map.I * M.IU + sum_map.Q * M.QU + sum_map.U * M.UU
         return bin_map
 
-    def compute_dipole_constraint_invcond(self, M, dipole_map):
+    def compute_dipole_constraint_invcond(self, M, dipole_map, mask=None):
         if self.IQU:
             raise NotImplementedError("Constraint implemented T-ONLY")
+        if mask is None:
+            mask = dipole_map.I.copy()
+            mask[:] = 1.
 
         cond = np.zeros((2,2), dtype=np.float)
-        cond[0,0] = (dipole_map.I**2).sum()
-        cond[1,1] = len(dipole_map.I) # monopole**2
-        cond[1,0] = (dipole_map.I).sum() # dipole * monopole
+        cond[0,0] = (dipole_map.I**2 * mask).sum()
+        cond[1,1] = np.count_nonzero(dipole_map.I * mask) # monopole**2
+        cond[1,0] = (dipole_map.I * mask).sum() # dipole * monopole
         cond[0,1] = cond[1,0]
         invcond = np.linalg.inv(cond)
         return invcond
