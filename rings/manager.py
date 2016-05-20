@@ -201,7 +201,8 @@ class RingSetManager(object):
         if mask is None:
             mask = bin_map.I.copy()
             mask[:] = 1.
-        dipole_proj = np.dot(dipole_map_cond, np.array([[(bin_map.I * dipole_map.I * mask).sum()], [(bin_map.I * mask).sum()]]))
+        masked_I = (bin_map.I * mask).dropna()
+        dipole_proj = np.dot(dipole_map_cond, np.array([[(dipole_map.I * masked_I).sum()], [masked_I.sum()]]))
         return pd.DataFrame(dict(I=(dipole_proj[0,0] * dipole_map.I + dipole_proj[1,0])))
 
     def remove_signal(self, calibrated_ringsets, bin_map=None, M=None, dipole_map=None, dipole_map_cond=None, mask=None):
